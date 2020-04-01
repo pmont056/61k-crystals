@@ -1,0 +1,106 @@
+import pandas as pd
+import numpy as np
+import keras
+from keras import preprocessing as kp
+from sklearn.metrics import explained_variance_score
+from sklearn.model_selection import train_test_split
+from keras import models, Sequential
+from keras.layers import Conv2D, MaxPooling2D, Flatten, Dense
+from keras.models import Sequential
+from keras.layers import LSTM, Dense, Dropout, Masking, Embedding
+from sklearn.preprocessing import MinMaxScaler
+from keras import optimizers
+
+
+df_62k = pd.read_json('/Users/minhpham/Desktop/Machine Learning Project/m1507656/df_62k.json', orient='split')
+molecules = df_62k['canonical_smiles'][0:61489]
+
+print(molecules[61200])
+
+# X-value one hot encode
+x = []
+n= 0
+while n < 61489:
+    ohe = keras.preprocessing.text.one_hot(molecules[n],
+                                              1000,
+                                              filters='!"%&*,;<>?[\\]^_`{|}~\t\n',
+                                              lower=False,
+                                              split=" ")
+    x.append(ohe)
+    n+=1
+
+x = np.array(x)
+
+max_len = len(max(molecules, key=len))
+x = kp.sequence.pad_sequences(x, padding ='post', maxlen=15)
+print(x[61200])
+
+# Y-value
+y = df_62k['total_energy_pbe'][0:61489]
+print(y[61200])
+
+y = y[:,np.newaxis]
+'''x = x[:,np.newaxis]'''
+scaler = MinMaxScaler(feature_range=(0, 1))
+scaler1 = MinMaxScaler(feature_range=(0, 1))
+
+# fit scaler on data
+scaler.fit(y)
+#scaler1.fit(x)
+y = scaler.transform(y)
+print(x.shape)
+print(y.shape)
+
+X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2)
+print(X_train.shape)
+
+model = Sequential()
+
+# Embedding layer
+model.add(
+    Embedding(input_dim=49191,
+              input_length = 15,
+              output_dim=1000,
+              trainable=True,
+              mask_zero=True))
+
+
+# Recurrent layer
+model.add(LSTM(1024, return_sequences=True,
+               dropout=0.1, recurrent_dropout=0.1))
+model.add(LSTM(512, return_sequences=True,
+               dropout=0.1, recurrent_dropout=0.1))
+model.add(LSTM(256, return_sequences=True,
+               dropout=0.1, recurrent_dropout=0.1))
+model.add(LSTM(128, return_sequences=False,
+               dropout=0.1, recurrent_dropout=0.1))
+
+# Fully connected layer
+model.add(Dense(512, activation='sigmoid'))
+
+# Dropout for regularization
+model.add(Dropout(0.5))
+
+# Output layer
+model.add(Dense(1, activation='softmax'))
+
+print(model.summary())
+# Compile the model
+
+sgd = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.0, nesterov=True)
+model.compile(loss='mean_squared_error', optimizer="Adam", metrics=['mean_squared_error'])
+
+model.fit(
+  X_train,
+  y_train,
+  epochs=1,
+)
+
+print(X_test[12000], y_test[12000])
+y_test = scaler.inverse_transform(y_test)
+print(y_test[12000])
+print("-------")
+y_pred = model.predict(X_test)
+y_pred = scaler.inverse_transform(y_pred)
+print(y_pred[12000])
+
