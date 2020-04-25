@@ -120,7 +120,7 @@ def calc_structure_feature(c):
     if c == '(':
         feature[0] = 1
         flag = 0
-    elif c == ')':`
+    elif c == ')':'
         feature[1] = 1
         flag = 0
     elif c == '[':
@@ -181,7 +181,7 @@ def one_hot_encoder(molecule):
     SMILES Strings of the molecule
     
     Return
-    42*400 np one hot encode arrays of letter and non-letter character
+    42*400 2D nparray one hot encode arrays of letter and non-letter character
     
     '''
 
