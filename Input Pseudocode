@@ -1,0 +1,13 @@
+for loop(molecule)
+    one_hot_encode_array = []
+    if element at index is string:
+        calc_atom_feature(molecule)
+
+    add "list " to one_hot_encode_array
+
+    else:
+        calc_structure_feature(molecule)
+
+    add "list" to one_hot_encode_array
+
+    add (max length- number of characters) 42 long 0 list to pad
