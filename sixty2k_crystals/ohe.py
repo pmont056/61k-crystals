@@ -120,7 +120,7 @@ def calc_structure_feature(c):
     if c == '(':
         feature[0] = 1
         flag = 0
-    elif c == ')':'
+    elif c == ')':
         feature[1] = 1
         flag = 0
     elif c == '[':
