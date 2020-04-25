@@ -25,7 +25,7 @@ upperReg = re.compile(r'^[A-Z]+$')
 def isupper(s):
     return upperReg.match(s) is not None
     
-def calc_atom_feature(molecule, i):  # i is just the index for the atoms in the molecules
+def calc_atom_feature(molecule):  # i is just the index for the atoms in the molecules
     '''
     Convert Single Letter Character, i.e Atomic Symbol of a Smiles String into OneHotEncode 1D array length 42 long
     
@@ -86,7 +86,7 @@ def calc_atom_feature(molecule, i):  # i is just the index for the atoms in the 
     # Add the last 21 vectors on to the array
 
     if islower(c):
-        pass
+        continue
     elif isupper(c):
         if c == "H":
             feature.extend(H_Vector)
@@ -120,7 +120,7 @@ def calc_structure_feature(c):
     if c == '(':
         feature[0] = 1
         flag = 0
-    elif c == ')':
+    elif c == ')':'
         feature[1] = 1
         flag = 0
     elif c == '[':
@@ -184,8 +184,8 @@ def one_hot_encoder(molecule):
     42*400 2D nparray one hot encode arrays of letter and non-letter character
     
     '''
-
-    one_hot_encode_array = np.array([])
+    
+    OHE_array = np.array([])
     split_molecule = list(molecule)
 
     i = 0
@@ -195,10 +195,13 @@ def one_hot_encoder(molecule):
             if ch == "i" or "a" or "e" or "l" or "s" or "r":   # Make sure symbols like Na or Si doesn't get counted twice
                 continue
             else:
-                one_hot_encode_array = np.append(np.array([calc_atom_feature(molecule, i)]))
+                b = np.array([calc_atom_feature(molecule)]) # b is a placeholder
+                OHE_array = np.append (OHE_array, b)
+                
             i += 1
 
         else:
-            one_hot_encode_array = np.append(np.array([calc_structure_feature(ch)]))
-
-    return one_hot_encode_array
+            b = np.array([calc_structure_feature(molecule)])
+            OHE_array = np.append (OHE_array, b)
+            
+    return OHE_array
