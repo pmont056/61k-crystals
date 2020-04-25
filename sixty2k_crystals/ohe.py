@@ -186,6 +186,9 @@ def one_hot_encoder(molecule):
     '''
     
     OHE_array = np.array([])
+    #OHE_array = np.zeros((42, 400))
+    OHE_array[0:22]
+    
     split_molecule = list(molecule)
 
     i = 0
