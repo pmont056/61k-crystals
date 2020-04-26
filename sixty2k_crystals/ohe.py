@@ -90,8 +90,8 @@ def calc_atom_feature(molecule, i):  # i is just the index for the atoms in the 
     elif isupper(c):
         if c == "H":
             feature.extend(H_Vector)
-        else:
-            feature.extend([0] * 21)
+    else:
+        feature.extend([0] * 21)    # For atoms such as Li and Cl
 
     return feature
     
@@ -163,7 +163,7 @@ def calc_structure_feature(c):
             else:
                 label.append(c)
                 feature[19] = 1
-        else:
+    else:
             feature[int(c) - 1 + 12] = 1
             flag = 0
 
@@ -191,20 +191,25 @@ def one_hot_encoder(molecule):
     
     split_molecule = list(molecule)
 
-    i = 0
+    OHE_array = np.zeros((42,400))
+    split_molecule = list(molecule)
+
+    j = 0    # index for order of character in SMILES string
+    i = 0    # index for order of atoms on SMILES string
+    
     for n in range(len(molecule)):
         ch = split_molecule[n]
         if ch in list(string.ascii_lowercase):
             if ch == "i" or "a" or "e" or "l" or "s" or "r":   # Make sure symbols like Na or Si doesn't get counted twice
                 continue
             else:
-                b = np.array([calc_atom_feature(molecule, i)]) # b is a placeholder
-                OHE_array = np.append (OHE_array, b)
+                OHE_array[:, j] = calc_atom_feature(molecule, i)
                 
+            j += 1
             i += 1
 
         else:
-            b = np.array([calc_structure_feature(molecule)])
-            OHE_array = np.append (OHE_array, b)
+            OHE_array[:, j] = calc_atom_feature(molecule)
+            j += 1
             
     return OHE_array
