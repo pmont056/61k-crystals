@@ -1,4 +1,4 @@
-import chainer      # install this module at https://docs.chainer.org/en/stable/install.html
+import chainer
 import chainer.functions as F
 import chainer.links as L
 from chainer import cuda, Function, gradient_check, report, training, utils, Variable
@@ -7,22 +7,63 @@ from chainer import Reporter, report, report_scope
 from chainer import Link, Chain, ChainList, training
 #from chainer.training import extensions
 
-import numpy as np # Use this instead of cupy
+import numpy as np
+import cupy as cp
 
-# import SCFPfunctions as Mf.  This doesn't appear in the model for some reasons.
+#import SCFPfunctions as Mf
+
+#-------------------------------------------------------------
+ #Sigmoid function definition
+def strong_sigmoid(x):
+    return 1*(x >=0)
+
+#-------------------------------------------------------------
+ #detaset function definition
+def random_list(x, seed=0):
+    np.random.seed(seed)
+    np.random.shuffle(x)
+
+def data_boostDataset(P,N,boost=1,seed=0):
+    random_list(P,seed)
+    random_list(N,seed)
+    T = [0]*len(N)+ [1]*(len(P)*boost)
+    for i in range(boost):N.extend(P)
+    random_list(N,seed)
+    random_list(T,seed)
+    return N, T
 
 #-------------------------------------------------------------
     #Network definition
 class CNN(chainer.Chain):
 
-    def __init__(self, atomsize, lensize, k1, s1, f1, k2, s2, k3, s3, f3, k4, s4, n_hid, n_out):
-        
-        # atomsize, lenseize = size of feature matrix
+    def __init__(self, atomsize, lensize, k1, s1, f1, k2, s2, k3, s3, f3, k4, s4, n_hid, n_out): 
+        '''# atomsize, lensize = size of feature matrix
+        atomsize = 281
+        lensize = 42
+
         # k1, s1, f1 = window-size, stride-step, No. of filters of first convolution layer
+        k1 = (1, 51)
+        s1 = 1 or 3 or 5
+        f1 = (1, 1024)
+
         # k2, s2 = window-size, stride-step of first max-pooling layer
+        k2 = (1, 51)
+        s2 = 1 or 3 or 5
+
         # k3, s3, f3 = window-size, stride-step, No. of filters of second convolution layer
+        k3 = (1, 51)
+        s3 = 1 or 3 or 5
+        f3 = (1, 1024)
+
         # k4, s4 = window-size, stride-step of second max-pooling layer
+        k4 = (1, 51)
+        s4 = 1 or 3 or 5
+
+        n_hid = size of last hidden state of encoding?
+        n_out = size of output'''
         
+        # CNN Architecture
+
         super(CNN, self).__init__(
             conv1=L.Convolution2D(1, f1, (k1, lensize), stride=s1, pad = (k1//2,0)),
             bn1=L.BatchNormalization(f1),
@@ -38,61 +79,74 @@ class CNN(chainer.Chain):
         self.l2 = (self.l1+(self.k2//2*2)-self.k2)//self.s2+1
         self.l3 = (self.l2+(self.k3//2*2)-self.k3)//self.s3+1
         self.l4 = (self.l3+(self.k4//2*2)-self.k4)//self.s4+1
-        
+
+        # Evaluation
+
     def __call__(self, x, t):
         y, sr = self.predict(x)
         loss = F.sigmoid_cross_entropy(y, t) + sr
         accuracy = F.binary_accuracy(y, t)
         report({'loss': loss, 'accuracy': accuracy}, self)
         return loss    
-    
+        
+        # x = independent variable (smiles ohe array)
+        # y = dependent variable (pbe energy?) (training set)?
+        # t = testing set?
+
+        # Fit and Predict
+
     def predict(self,x):
         h = F.leaky_relu(self.bn1(self.conv1(x))) # 1st conv
         h = F.average_pooling_2d(h, (self.k2,1), stride=self.s2, pad=(self.k2//2,0)) # 1st pooling
         h = F.leaky_relu(self.bn2(self.conv2(h))) # 2nd conv
         h = F.average_pooling_2d(h, (self.k4,1), stride=self.s4, pad=(self.k4//2,0)) # 2nd pooling
-        h = F.max_pooling_2d(h, (self.l4,1)) # grobal max pooling, fingerprint
+        h = F.max_pooling_2d(h, (self.l4,1)) # global max pooling, fingerprint
         h = self.fc3(h) # fully connected
-        sr = 0.00001* np.mean(np.log(1 + h.data * h.data)) # sparse regularization
+        sr = 0.00001* cp.mean(cp.log(1 + h.data * h.data)) # sparse regularization
         h = F.leaky_relu(self.bn3(h))
         return self.fc4(h), sr
 
+        # SCFP function
+
     def fingerprint(self,x):
-        x = Variable(x.astype(np.float32).reshape(-1,1, self.atomsize, self.lensize))
+        x = Variable(x.astype(cp.float32).reshape(-1,1, self.atomsize, self.lensize))
         h = F.leaky_relu(self.bn1(self.conv1(x))) # 1st conv
         h = F.average_pooling_2d(h, (self.k2,1), stride=self.s2, pad=(self.k2//2,0)) # 1st pooling
         h = F.leaky_relu(self.bn2(self.conv2(h))) # 2nd conv
         h = F.average_pooling_2d(h, (self.k3,1), stride=self.s3, pad=(self.k3//2,0)) # 2nd pooling
         h = F.max_pooling_2d(h, (self.l4,1)) # grobal max pooling, fingerprint
         return h.data
-    
+
+        # 1st convolution layer
+
     def layer1(self,x):
-        x = Variable(x.astype(np.float32).reshape(-1,1, self.atomsize, self.lensize))
+        x = Variable(x.astype(cp.float32).reshape(-1,1, self.atomsize, self.lensize))
         h = self.bn1(self.conv1(x)) # 1st conv
         return h.data
-    
+
+        # 1st pooling layer 
+
     def pool1(self,x):
-        x = Variable(x.astype(np.float32).reshape(-1,1, self.atomsize, self.lensize))
+        x = Variable(x.astype(cp.float32).reshape(-1,1, self.atomsize, self.lensize))
         h = F.leaky_relu(self.bn1(self.conv1(x))) # 1st conv
         h = F.average_pooling_2d(h, (self.k2,1), stride=self.s2, pad=(self.k2//2,0)) # 1st pooling
         return h.data
-    
+
+        # 2nd convolution layer
+
     def layer2(self,x):
-        x = Variable(x.astype(np.float32).reshape(-1,1, self.atomsize, self.lensize))
+        x = Variable(x.astype(cp.float32).reshape(-1,1, self.atomsize, self.lensize))
         h = F.leaky_relu(self.bn1(self.conv1(x))) # 1st conv
         h = F.average_pooling_2d(h, (self.k2,1), stride=self.s2, pad=(self.k2//2,0)) # 1st pooling
         h = self.bn2(self.conv2(h)) # 2nd conv
         return h.data
     
+        # 2nd pooling layer  
+
     def pool2(self,x):
-        x = Variable(x.astype(np.float32).reshape(-1,1, self.atomsize, self.lensize))
+        x = Variable(x.astype(cp.float32).reshape(-1,1, self.atomsize, self.lensize))
         h = F.leaky_relu(self.bn1(self.conv1(x))) # 1st conv
         h = F.average_pooling_2d(h, (self.k2,1), stride=self.s2, pad=(self.k2//2,0)) # 1st pooling
         h = F.leaky_relu(self.bn2(self.conv2(h))) # 2nd conv
         h = F.average_pooling_2d(h, (self.k3,1), stride=self.s3, pad=(self.k3//2,0)) # 2nd pooling
         return h.data
-
-#------------------------------------------------------------- 
-
-#def strong_sigmoid(x):
-#    return 1*(x >=0)
